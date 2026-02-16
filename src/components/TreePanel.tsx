@@ -24,6 +24,8 @@ const TREE: TreeSection[] = [
     icon: "FileText",
     children: [
       { label: "Счета", icon: "Receipt", tab: { id: "invoices", type: "invoices", title: "Счета" } },
+      { label: "Акты", icon: "FileCheck", tab: { id: "acts", type: "acts", title: "Акты" } },
+      { label: "УПД", icon: "FileBadge", tab: { id: "upds", type: "upds", title: "УПД" } },
     ],
   },
 ];

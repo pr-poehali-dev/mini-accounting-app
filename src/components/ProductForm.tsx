@@ -14,6 +14,7 @@ const EMPTY: Product = {
   vat: 20,
   barcode: "",
   currency: "RUB",
+  unit: "шт",
 };
 
 export default function ProductForm({ entityId }: { entityId?: string }) {
@@ -103,6 +104,14 @@ export default function ProductForm({ entityId }: { entityId?: string }) {
           <div>
             <Label className="text-xs mb-1">Штрих-код</Label>
             <Input value={form.barcode} onChange={(e) => update("barcode", e.target.value)} placeholder="4600000000001" />
+          </div>
+        </div>
+        <div>
+          <Label className="text-xs mb-1">Единица измерения</Label>
+          <div className="flex gap-1">
+            {["шт", "час", "усл", "м", "кг", "л"].map((u) => (
+              <Button key={u} size="sm" variant={form.unit === u ? "default" : "outline"} onClick={() => update("unit", u)}>{u}</Button>
+            ))}
           </div>
         </div>
       </div>

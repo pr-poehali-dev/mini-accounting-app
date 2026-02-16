@@ -1,12 +1,16 @@
-import { Company, Product, Invoice, TabItem } from "./types";
+import { Company, Product, Invoice, Act, UPD, TabItem } from "./types";
 
 const STORAGE_KEYS = {
   companies: "mb_companies",
   products: "mb_products",
   invoices: "mb_invoices",
+  acts: "mb_acts",
+  upds: "mb_upds",
   tabs: "mb_tabs",
   activeTab: "mb_activeTab",
   invoiceCounter: "mb_invoiceCounter",
+  actCounter: "mb_actCounter",
+  updCounter: "mb_updCounter",
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -30,21 +34,49 @@ class Store {
   companies: Company[] = [];
   products: Product[] = [];
   invoices: Invoice[] = [];
+  acts: Act[] = [];
+  upds: UPD[] = [];
   tabs: TabItem[] = [];
   activeTabId: string = "";
   invoiceCounter: number = 1;
+  actCounter: number = 1;
+  updCounter: number = 1;
 
   constructor() {
     this.companies = load(STORAGE_KEYS.companies, []);
     this.products = load(STORAGE_KEYS.products, []);
     this.invoices = load(STORAGE_KEYS.invoices, []);
+    this.acts = load(STORAGE_KEYS.acts, []);
+    this.upds = load(STORAGE_KEYS.upds, []);
     this.tabs = load(STORAGE_KEYS.tabs, []);
     this.activeTabId = load(STORAGE_KEYS.activeTab, "");
     this.invoiceCounter = load(STORAGE_KEYS.invoiceCounter, 1);
+    this.actCounter = load(STORAGE_KEYS.actCounter, 1);
+    this.updCounter = load(STORAGE_KEYS.updCounter, 1);
 
     if (this.companies.length === 0) {
       this.seed();
     }
+    this.migrateData();
+  }
+
+  private migrateData() {
+    let changed = false;
+    this.companies = this.companies.map((c) => {
+      if (!("director" in c)) {
+        changed = true;
+        return { ...c, director: "", accountant: "" };
+      }
+      return c;
+    });
+    this.products = this.products.map((p) => {
+      if (!("unit" in p)) {
+        changed = true;
+        return { ...p, unit: "шт" };
+      }
+      return p;
+    });
+    if (changed) this.persist();
   }
 
   private seed() {
@@ -60,10 +92,12 @@ class Store {
         ks: "30101810400000000225",
         address: "г. Москва, ул. Ленина, д. 1",
         role: "seller",
+        director: "Петров А.В.",
+        accountant: "Сидорова Е.Н.",
       },
       {
         id: "c2",
-        name: 'ИП Иванов И.И.',
+        name: "ИП Иванов И.И.",
         inn: "771234567890",
         kpp: "",
         bank: "АО Тинькофф Банк",
@@ -72,11 +106,13 @@ class Store {
         ks: "30101810145250000974",
         address: "г. Москва, ул. Пушкина, д. 5",
         role: "buyer",
+        director: "Иванов И.И.",
+        accountant: "",
       },
     ];
     this.products = [
-      { id: "p1", name: "Консультация (1 час)", price: 500000, vat: 20, barcode: "4600000000001", currency: "RUB" },
-      { id: "p2", name: "Разработка сайта", price: 15000000, vat: 20, barcode: "4600000000002", currency: "RUB" },
+      { id: "p1", name: "Консультация (1 час)", price: 500000, vat: 20, barcode: "4600000000001", currency: "RUB", unit: "час" },
+      { id: "p2", name: "Разработка сайта", price: 15000000, vat: 20, barcode: "4600000000002", currency: "RUB", unit: "шт" },
     ];
     this.persist();
   }
@@ -85,9 +121,13 @@ class Store {
     save(STORAGE_KEYS.companies, this.companies);
     save(STORAGE_KEYS.products, this.products);
     save(STORAGE_KEYS.invoices, this.invoices);
+    save(STORAGE_KEYS.acts, this.acts);
+    save(STORAGE_KEYS.upds, this.upds);
     save(STORAGE_KEYS.tabs, this.tabs);
     save(STORAGE_KEYS.activeTab, this.activeTabId);
     save(STORAGE_KEYS.invoiceCounter, this.invoiceCounter);
+    save(STORAGE_KEYS.actCounter, this.actCounter);
+    save(STORAGE_KEYS.updCounter, this.updCounter);
     this.notify();
   }
 
@@ -100,7 +140,6 @@ class Store {
     this.listeners.forEach((fn) => fn());
   }
 
-  // Tabs
   openTab(tab: TabItem) {
     const existing = this.tabs.find((t) => t.id === tab.id);
     if (!existing) {
@@ -124,7 +163,6 @@ class Store {
     this.persist();
   }
 
-  // Companies
   saveCompany(company: Company) {
     const idx = this.companies.findIndex((c) => c.id === company.id);
     if (idx >= 0) {
@@ -140,7 +178,6 @@ class Store {
     this.persist();
   }
 
-  // Products
   saveProduct(product: Product) {
     const idx = this.products.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
@@ -156,7 +193,6 @@ class Store {
     this.persist();
   }
 
-  // Invoices
   saveInvoice(invoice: Invoice) {
     const idx = this.invoices.findIndex((i) => i.id === invoice.id);
     if (idx >= 0) {
@@ -172,9 +208,53 @@ class Store {
     this.persist();
   }
 
+  saveAct(act: Act) {
+    const idx = this.acts.findIndex((a) => a.id === act.id);
+    if (idx >= 0) {
+      this.acts = this.acts.map((a) => (a.id === act.id ? act : a));
+    } else {
+      this.acts = [...this.acts, act];
+    }
+    this.persist();
+  }
+
+  deleteAct(id: string) {
+    this.acts = this.acts.filter((a) => a.id !== id);
+    this.persist();
+  }
+
+  saveUpd(upd: UPD) {
+    const idx = this.upds.findIndex((u) => u.id === upd.id);
+    if (idx >= 0) {
+      this.upds = this.upds.map((u) => (u.id === upd.id ? upd : u));
+    } else {
+      this.upds = [...this.upds, upd];
+    }
+    this.persist();
+  }
+
+  deleteUpd(id: string) {
+    this.upds = this.upds.filter((u) => u.id !== id);
+    this.persist();
+  }
+
   nextInvoiceNumber(): string {
     const num = this.invoiceCounter;
     this.invoiceCounter++;
+    this.persist();
+    return String(num).padStart(4, "0");
+  }
+
+  nextActNumber(): string {
+    const num = this.actCounter;
+    this.actCounter++;
+    this.persist();
+    return String(num).padStart(4, "0");
+  }
+
+  nextUpdNumber(): string {
+    const num = this.updCounter;
+    this.updCounter++;
     this.persist();
     return String(num).padStart(4, "0");
   }

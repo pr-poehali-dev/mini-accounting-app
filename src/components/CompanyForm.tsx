@@ -8,16 +8,8 @@ import { generateId } from "@/lib/format";
 import { useState, useEffect } from "react";
 
 const EMPTY: Company = {
-  id: "",
-  name: "",
-  inn: "",
-  kpp: "",
-  bank: "",
-  bik: "",
-  rs: "",
-  ks: "",
-  address: "",
-  role: "buyer",
+  id: "", name: "", inn: "", kpp: "", bank: "", bik: "", rs: "", ks: "",
+  address: "", role: "buyer", director: "", accountant: "",
 };
 
 export default function CompanyForm({ entityId }: { entityId?: string }) {
@@ -56,6 +48,8 @@ export default function CompanyForm({ entityId }: { entityId?: string }) {
     { key: "bik", label: "БИК", placeholder: "044525225" },
     { key: "rs", label: "Р/с", placeholder: "40702810938000012345" },
     { key: "ks", label: "К/с", placeholder: "30101810400000000225" },
+    { key: "director", label: "Руководитель", placeholder: "Петров А.В." },
+    { key: "accountant", label: "Бухгалтер", placeholder: "Сидорова Е.Н." },
   ];
 
   return (

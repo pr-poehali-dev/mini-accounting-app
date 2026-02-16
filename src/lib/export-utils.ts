@@ -1,16 +1,17 @@
-import { Invoice, Company, Product } from "./types";
+import { Invoice, Act, UPD, Company, Product, DocLine } from "./types";
 import { formatMoney, formatDate, calcLineTotal, calcLineVat, calcLineTotalWithoutVat } from "./format";
 import qrcode from "qrcode-generator";
 import * as XLSX from "xlsx";
 
-function getInvoiceData(invoice: Invoice, companies: Company[], products: Product[]) {
-  const seller = companies.find((c) => c.id === invoice.sellerId);
-  const buyer = companies.find((c) => c.id === invoice.buyerId);
+export function getDocData(lines: DocLine[], companies: Company[], products: Product[], sellerId: string, buyerId: string) {
+  const seller = companies.find((c) => c.id === sellerId);
+  const buyer = companies.find((c) => c.id === buyerId);
 
-  const lines = invoice.lines.map((line) => {
+  const rows = lines.map((line) => {
     const product = products.find((p) => p.id === line.productId);
     return {
       name: product?.name || "—",
+      unit: product?.unit || "шт",
       quantity: line.quantity,
       price: line.price,
       vat: line.vat,
@@ -20,11 +21,11 @@ function getInvoiceData(invoice: Invoice, companies: Company[], products: Produc
     };
   });
 
-  const grandTotal = lines.reduce((s, l) => s + l.total, 0);
-  const grandVat = lines.reduce((s, l) => s + l.vatAmount, 0);
+  const grandTotal = rows.reduce((s, l) => s + l.total, 0);
+  const grandVat = rows.reduce((s, l) => s + l.vatAmount, 0);
   const grandWithoutVat = grandTotal - grandVat;
 
-  return { seller, buyer, lines, grandTotal, grandVat, grandWithoutVat };
+  return { seller, buyer, rows, grandTotal, grandVat, grandWithoutVat };
 }
 
 export function generateQRString(invoice: Invoice, companies: Company[]): string {
@@ -53,8 +54,9 @@ export function generateQRDataUrl(text: string): string {
   return qr.createDataURL(4, 0);
 }
 
-export function exportExcel(invoice: Invoice, companies: Company[], products: Product[]) {
-  const { seller, buyer, lines, grandTotal, grandVat, grandWithoutVat } = getInvoiceData(invoice, companies, products);
+export function exportInvoiceExcel(invoice: Invoice, companies: Company[], products: Product[]) {
+  const { seller, buyer, rows, grandTotal, grandVat, grandWithoutVat } = getDocData(invoice.lines, companies, products, invoice.sellerId, invoice.buyerId);
+  const cur = invoice.currency;
 
   const data = [
     [`Счет на оплату №${invoice.number} от ${formatDate(invoice.date)}`],
@@ -67,37 +69,87 @@ export function exportExcel(invoice: Invoice, companies: Company[], products: Pr
     ["Покупатель:", buyer?.name || ""],
     ["ИНН:", buyer?.inn || "", "КПП:", buyer?.kpp || ""],
     [],
-    ["№", "Наименование", "Кол-во", "Цена", "Ставка НДС", "Сумма НДС", "Сумма"],
-    ...lines.map((l, i) => [
-      i + 1,
-      l.name,
-      l.quantity,
-      formatMoney(l.price, invoice.currency),
-      `${l.vat}%`,
-      formatMoney(l.vatAmount, invoice.currency),
-      formatMoney(l.total, invoice.currency),
+    ["№", "Наименование", "Ед.", "Кол-во", "Цена", "Сумма без НДС", "НДС", "Сумма НДС", "Всего"],
+    ...rows.map((l, i) => [
+      i + 1, l.name, l.unit, l.quantity,
+      formatMoney(l.price, cur), formatMoney(l.totalWithoutVat, cur),
+      `${l.vat}%`, formatMoney(l.vatAmount, cur), formatMoney(l.total, cur),
     ]),
     [],
-    ["", "", "", "", "Итого без НДС:", "", formatMoney(grandWithoutVat, invoice.currency)],
-    ["", "", "", "", "НДС:", "", formatMoney(grandVat, invoice.currency)],
-    ["", "", "", "", "Итого:", "", formatMoney(grandTotal, invoice.currency)],
+    ["", "", "", "", "", "", "", "Итого без НДС:", formatMoney(grandWithoutVat, cur)],
+    ["", "", "", "", "", "", "", "НДС:", formatMoney(grandVat, cur)],
+    ["", "", "", "", "", "", "", "Всего:", formatMoney(grandTotal, cur)],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 10 }, { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 18 }];
+  ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 6 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 6 }, { wch: 14 }, { wch: 16 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Счет");
   XLSX.writeFile(wb, `Счет_${invoice.number}.xlsx`);
 }
 
-export function exportXML(invoice: Invoice, companies: Company[], products: Product[]) {
-  const { seller, buyer, lines, grandTotal, grandVat } = getInvoiceData(invoice, companies, products);
+export function exportActExcel(act: Act, companies: Company[], products: Product[]) {
+  const { seller, buyer, rows, grandTotal, grandVat } = getDocData(act.lines, companies, products, act.sellerId, act.buyerId);
+  const cur = act.currency;
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<Invoice>
-  <Number>${invoice.number}</Number>
-  <Date>${invoice.date}</Date>
-  <Currency>${invoice.currency}</Currency>
+  const data = [
+    [`Акт №${act.number} от ${formatDate(act.date)}`],
+    ...(act.contractNumber ? [[`К договору №${act.contractNumber} от ${act.contractDate ? formatDate(act.contractDate) : "___"}`]] : []),
+    [],
+    ["Исполнитель:", seller?.name || ""],
+    ["Заказчик:", buyer?.name || ""],
+    [],
+    ["№", "Наименование", "Ед.", "Кол-во", "Цена", "Сумма"],
+    ...rows.map((l, i) => [i + 1, l.name, l.unit, l.quantity, formatMoney(l.price, cur), formatMoney(l.total, cur)]),
+    [],
+    ["", "", "", "", "НДС:", formatMoney(grandVat, cur)],
+    ["", "", "", "", "Итого:", formatMoney(grandTotal, cur)],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"] = [{ wch: 5 }, { wch: 35 }, { wch: 6 }, { wch: 8 }, { wch: 15 }, { wch: 18 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Акт");
+  XLSX.writeFile(wb, `Акт_${act.number}.xlsx`);
+}
+
+export function exportUpdExcel(upd: UPD, companies: Company[], products: Product[]) {
+  const { seller, buyer, rows, grandTotal, grandVat, grandWithoutVat } = getDocData(upd.lines, companies, products, upd.sellerId, upd.buyerId);
+  const cur = upd.currency;
+
+  const data = [
+    [`УПД №${upd.number} от ${formatDate(upd.date)}`],
+    [`Статус: ${upd.status}`],
+    [],
+    ["Продавец:", seller?.name || ""],
+    ["Покупатель:", buyer?.name || ""],
+    [],
+    ["№", "Наименование", "Ед.", "Кол-во", "Цена", "Без НДС", "НДС%", "Сумма НДС", "С НДС"],
+    ...rows.map((l, i) => [
+      i + 1, l.name, l.unit, l.quantity,
+      formatMoney(l.price, cur), formatMoney(l.totalWithoutVat, cur),
+      `${l.vat}%`, formatMoney(l.vatAmount, cur), formatMoney(l.total, cur),
+    ]),
+    [],
+    ["", "", "", "", "", "", "", "Без НДС:", formatMoney(grandWithoutVat, cur)],
+    ["", "", "", "", "", "", "", "НДС:", formatMoney(grandVat, cur)],
+    ["", "", "", "", "", "", "", "Итого:", formatMoney(grandTotal, cur)],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 6 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 6 }, { wch: 14 }, { wch: 16 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "УПД");
+  XLSX.writeFile(wb, `УПД_${upd.number}.xlsx`);
+}
+
+function docToXML(type: string, number: string, date: string, seller: Company | undefined, buyer: Company | undefined, rows: { name: string; quantity: number; price: number; vat: number; vatAmount: number; total: number }[], grandTotal: number, grandVat: number, currency: string, extra: string = "") {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<${type}>
+  <Number>${number}</Number>
+  <Date>${date}</Date>
+  <Currency>${currency}</Currency>
+  ${extra}
   <Seller>
     <Name>${seller?.name || ""}</Name>
     <INN>${seller?.inn || ""}</INN>
@@ -113,7 +165,7 @@ export function exportXML(invoice: Invoice, companies: Company[], products: Prod
     <KPP>${buyer?.kpp || ""}</KPP>
   </Buyer>
   <Lines>
-${lines.map((l, i) => `    <Line>
+${rows.map((l, i) => `    <Line>
       <Number>${i + 1}</Number>
       <Name>${l.name}</Name>
       <Quantity>${l.quantity}</Quantity>
@@ -125,82 +177,37 @@ ${lines.map((l, i) => `    <Line>
   </Lines>
   <Total>${grandTotal}</Total>
   <TotalVAT>${grandVat}</TotalVAT>
-</Invoice>`;
+</${type}>`;
+}
 
+function downloadXML(xml: string, filename: string) {
   const blob = new Blob([xml], { type: "application/xml" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Счет_${invoice.number}.xml`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-export function generatePrintHTML(invoice: Invoice, companies: Company[], products: Product[]): string {
-  const { seller, buyer, lines, grandTotal, grandVat, grandWithoutVat } = getInvoiceData(invoice, companies, products);
-  const qrString = generateQRString(invoice, companies);
-  const qrUrl = qrString ? generateQRDataUrl(qrString) : "";
-
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<title>Счет №${invoice.number}</title>
-<style>
-  body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; color: #000; }
-  h2 { font-size: 16px; margin: 20px 0 10px; }
-  table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-  th, td { border: 1px solid #000; padding: 4px 8px; text-align: left; }
-  th { background: #f5f5f5; font-weight: 600; }
-  .right { text-align: right; }
-  .bank-header { background: #000; color: #fff; padding: 4px 8px; font-weight: bold; }
-  .totals td { border: none; font-weight: 600; }
-  .qr { margin-top: 20px; }
-  .qr img { width: 150px; height: 150px; }
-  .sign-line { border-bottom: 1px solid #000; display: inline-block; width: 200px; margin: 0 10px; }
-  @media print { body { margin: 0; } }
-</style></head><body>
-<table style="border:2px solid #000;">
-  <tr><td style="border:none;width:50%">
-    <div class="bank-header">${seller?.bank || ""}</div>
-    <div>БИК: ${seller?.bik || ""}</div>
-    <div>К/с: ${seller?.ks || ""}</div>
-  </td><td style="border:none;">
-    <div>Сч. №</div>
-    <div><b>${seller?.rs || ""}</b></div>
-  </td></tr>
-</table>
-
-<h2>Счет на оплату №${invoice.number} от ${formatDate(invoice.date)}</h2>
-
-<p><b>Поставщик:</b> ${seller?.name || ""}, ИНН ${seller?.inn || ""}${seller?.kpp ? ", КПП " + seller.kpp : ""}, ${seller?.address || ""}</p>
-<p><b>Покупатель:</b> ${buyer?.name || ""}, ИНН ${buyer?.inn || ""}${buyer?.kpp ? ", КПП " + buyer.kpp : ""}, ${buyer?.address || ""}</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>№</th><th>Наименование</th><th>Кол-во</th><th>Цена</th><th>НДС</th><th>Сумма НДС</th><th>Сумма</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${lines.map((l, i) => `<tr>
-      <td>${i + 1}</td><td>${l.name}</td><td class="right">${l.quantity}</td>
-      <td class="right">${formatMoney(l.price, invoice.currency)}</td>
-      <td class="right">${l.vat}%</td>
-      <td class="right">${formatMoney(l.vatAmount, invoice.currency)}</td>
-      <td class="right">${formatMoney(l.total, invoice.currency)}</td>
-    </tr>`).join("")}
-  </tbody>
-</table>
-
-<table class="totals">
-  <tr><td></td><td></td><td></td><td></td><td class="right">Итого без НДС:</td><td class="right">${formatMoney(grandWithoutVat, invoice.currency)}</td></tr>
-  <tr><td></td><td></td><td></td><td></td><td class="right">НДС:</td><td class="right">${formatMoney(grandVat, invoice.currency)}</td></tr>
-  <tr><td></td><td></td><td></td><td></td><td class="right"><b>Итого:</b></td><td class="right"><b>${formatMoney(grandTotal, invoice.currency)}</b></td></tr>
-</table>
-
-<br/>
-<p>Руководитель <span class="sign-line"></span> / <span class="sign-line"></span></p>
-<p>Бухгалтер <span class="sign-line"></span> / <span class="sign-line"></span></p>
-
-${qrUrl ? `<div class="qr"><p>QR-код для оплаты:</p><img src="${qrUrl}" /></div>` : ""}
-</body></html>`;
+export function exportInvoiceXML(invoice: Invoice, companies: Company[], products: Product[]) {
+  const { seller, buyer, rows, grandTotal, grandVat } = getDocData(invoice.lines, companies, products, invoice.sellerId, invoice.buyerId);
+  const xml = docToXML("Invoice", invoice.number, invoice.date, seller, buyer, rows, grandTotal, grandVat, invoice.currency);
+  downloadXML(xml, `Счет_${invoice.number}.xml`);
 }
+
+export function exportActXML(act: Act, companies: Company[], products: Product[]) {
+  const { seller, buyer, rows, grandTotal, grandVat } = getDocData(act.lines, companies, products, act.sellerId, act.buyerId);
+  const extra = act.contractNumber ? `<ContractNumber>${act.contractNumber}</ContractNumber>\n  <ContractDate>${act.contractDate}</ContractDate>` : "";
+  const xml = docToXML("Act", act.number, act.date, seller, buyer, rows, grandTotal, grandVat, act.currency, extra);
+  downloadXML(xml, `Акт_${act.number}.xml`);
+}
+
+export function exportUpdXML(upd: UPD, companies: Company[], products: Product[]) {
+  const { seller, buyer, rows, grandTotal, grandVat } = getDocData(upd.lines, companies, products, upd.sellerId, upd.buyerId);
+  const extra = `<Status>${upd.status}</Status>`;
+  const xml = docToXML("UPD", upd.number, upd.date, seller, buyer, rows, grandTotal, grandVat, upd.currency, extra);
+  downloadXML(xml, `УПД_${upd.number}.xml`);
+}
+
+export { getDocData as getInvoiceData };

@@ -8,6 +8,8 @@ export function useStore() {
       companies: store.companies,
       products: store.products,
       invoices: store.invoices,
+      acts: store.acts,
+      upds: store.upds,
       tabs: store.tabs,
       activeTabId: store.activeTabId,
     })

@@ -5,6 +5,10 @@ import ProductList from "./ProductList";
 import ProductForm from "./ProductForm";
 import InvoiceList from "./InvoiceList";
 import InvoiceForm from "./InvoiceForm";
+import ActList from "./ActList";
+import ActForm from "./ActForm";
+import UpdList from "./UpdList";
+import UpdForm from "./UpdForm";
 
 export default function TabContent({ tab }: { tab: TabItem }) {
   switch (tab.type) {
@@ -20,6 +24,14 @@ export default function TabContent({ tab }: { tab: TabItem }) {
       return <InvoiceList />;
     case "invoice-edit":
       return <InvoiceForm entityId={tab.entityId} />;
+    case "acts":
+      return <ActList />;
+    case "act-edit":
+      return <ActForm entityId={tab.entityId} />;
+    case "upds":
+      return <UpdList />;
+    case "upd-edit":
+      return <UpdForm entityId={tab.entityId} />;
     default:
       return <div className="p-4 text-muted-foreground">Неизвестная форма</div>;
   }

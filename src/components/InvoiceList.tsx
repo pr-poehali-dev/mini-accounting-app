@@ -7,12 +7,11 @@ export default function InvoiceList() {
   const s = useStore();
 
   const createNew = () => {
-    const num = s.nextInvoiceNumber();
     const id = generateId();
     s.openTab({
       id: `invoice-${id}`,
       type: "invoice-edit",
-      title: `Счет №${num}`,
+      title: "Новый счет",
       entityId: id,
     });
   };

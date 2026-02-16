@@ -6,9 +6,13 @@ const TYPE_ICONS: Record<string, string> = {
   companies: "Building2",
   products: "Package",
   invoices: "Receipt",
+  acts: "FileCheck",
+  upds: "FileBadge",
   "company-edit": "Building2",
   "product-edit": "Package",
   "invoice-edit": "Receipt",
+  "act-edit": "FileCheck",
+  "upd-edit": "FileBadge",
 };
 
 export default function TabBar() {
