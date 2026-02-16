@@ -5,13 +5,9 @@ import Icon from "@/components/ui/icon";
 import { useStore } from "@/hooks/useStore";
 import { Invoice, Currency } from "@/lib/types";
 import { generateId, formatMoney, calcLineTotal, calcLineVat, formatDate } from "@/lib/format";
-import {
-  generateQRString,
-  generateQRDataUrl,
-  exportInvoiceExcel,
-  exportInvoiceXML,
-} from "@/lib/export-utils";
+import { generateQRString, generateQRDataUrl, exportInvoiceExcel, exportInvoiceXML } from "@/lib/export-utils";
 import { printInvoice1C } from "@/lib/print-templates";
+import { renderDocWithTemplate } from "@/lib/template-renderer";
 import { store as rawStore } from "@/lib/store";
 import DocLinesEditor from "./DocLinesEditor";
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -55,14 +51,22 @@ export default function InvoiceForm({ entityId }: { entityId?: string }) {
 
   const handleSave = () => { s.saveInvoice(form); setSaved(true); };
 
-  const handlePrint = () => {
-    const html = printInvoice1C(form, s.companies, s.products);
+  const invoiceTemplates = s.templates.filter((t) => t.docType === "invoice");
+
+  const getHTML = (tplId?: string) => {
+    const tpl = tplId ? s.templates.find((t) => t.id === tplId) : undefined;
+    if (tpl) return renderDocWithTemplate(tpl, form, s.companies, s.products);
+    return printInvoice1C(form, s.companies, s.products);
+  };
+
+  const handlePrint = (tplId?: string) => {
+    const html = getHTML(tplId);
     const win = window.open("", "_blank");
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 300); }
   };
 
-  const handlePreview = () => {
-    const html = printInvoice1C(form, s.companies, s.products);
+  const handlePreview = (tplId?: string) => {
+    const html = getHTML(tplId);
     const win = window.open("", "_blank");
     if (win) { win.document.write(html); win.document.close(); }
   };
@@ -120,13 +124,31 @@ export default function InvoiceForm({ entityId }: { entityId?: string }) {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 mb-4">
         <Button onClick={handleSave}><Icon name="Save" size={14} className="mr-1" /> Сохранить</Button>
-        <Button variant="outline" onClick={handlePrint}><Icon name="Printer" size={14} className="mr-1" /> Печать</Button>
-        <Button variant="outline" onClick={handlePreview}><Icon name="Eye" size={14} className="mr-1" /> Предпросмотр</Button>
+        <Button variant="outline" onClick={() => handlePrint()}><Icon name="Printer" size={14} className="mr-1" /> Печать</Button>
+        <Button variant="outline" onClick={() => handlePreview()}><Icon name="Eye" size={14} className="mr-1" /> Предпросмотр</Button>
         <Button variant="outline" onClick={() => exportInvoiceExcel(form, s.companies, s.products)}><Icon name="Table" size={14} className="mr-1" /> Excel</Button>
         <Button variant="outline" onClick={() => exportInvoiceXML(form, s.companies, s.products)}><Icon name="Code" size={14} className="mr-1" /> XML</Button>
       </div>
+
+      {invoiceTemplates.length > 0 && (
+        <div className="border rounded-lg p-3 mb-4 bg-muted/10">
+          <Label className="text-xs text-muted-foreground mb-2 block">Печать по шаблону:</Label>
+          <div className="flex flex-wrap gap-2">
+            {invoiceTemplates.map((tpl) => (
+              <div key={tpl.id} className="flex gap-1">
+                <Button size="sm" variant="outline" onClick={() => handlePreview(tpl.id)}>
+                  <Icon name="Eye" size={12} className="mr-1" />{tpl.name}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => handlePrint(tpl.id)}>
+                  <Icon name="Printer" size={12} />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {qrDataUrl && form.lines.length > 0 && (
         <div className="border rounded-lg p-4 bg-muted/20">

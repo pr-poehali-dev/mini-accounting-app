@@ -13,6 +13,8 @@ const TYPE_ICONS: Record<string, string> = {
   "invoice-edit": "Receipt",
   "act-edit": "FileCheck",
   "upd-edit": "FileBadge",
+  templates: "FileCog",
+  "template-edit": "FileCog",
 };
 
 export default function TabBar() {

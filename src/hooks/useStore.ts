@@ -10,6 +10,7 @@ export function useStore() {
       invoices: store.invoices,
       acts: store.acts,
       upds: store.upds,
+      templates: store.templates,
       tabs: store.tabs,
       activeTabId: store.activeTabId,
     })

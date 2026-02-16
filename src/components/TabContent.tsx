@@ -9,6 +9,8 @@ import ActList from "./ActList";
 import ActForm from "./ActForm";
 import UpdList from "./UpdList";
 import UpdForm from "./UpdForm";
+import TemplateList from "./TemplateList";
+import TemplateEditor from "./TemplateEditor";
 
 export default function TabContent({ tab }: { tab: TabItem }) {
   switch (tab.type) {
@@ -32,6 +34,10 @@ export default function TabContent({ tab }: { tab: TabItem }) {
       return <UpdList />;
     case "upd-edit":
       return <UpdForm entityId={tab.entityId} />;
+    case "templates":
+      return <TemplateList />;
+    case "template-edit":
+      return <TemplateEditor entityId={tab.entityId} />;
     default:
       return <div className="p-4 text-muted-foreground">Неизвестная форма</div>;
   }

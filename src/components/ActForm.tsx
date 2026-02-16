@@ -7,6 +7,7 @@ import { Act, Currency } from "@/lib/types";
 import { generateId, formatMoney, calcLineTotal, calcLineVat, formatDate } from "@/lib/format";
 import { exportActExcel, exportActXML } from "@/lib/export-utils";
 import { printAct1C } from "@/lib/print-templates";
+import { renderDocWithTemplate } from "@/lib/template-renderer";
 import { store as rawStore } from "@/lib/store";
 import DocLinesEditor from "./DocLinesEditor";
 import { useState, useEffect, useRef } from "react";
@@ -47,14 +48,22 @@ export default function ActForm({ entityId }: { entityId?: string }) {
 
   const handleSave = () => { s.saveAct(form); setSaved(true); };
 
-  const handlePrint = () => {
-    const html = printAct1C(form, s.companies, s.products);
+  const actTemplates = s.templates.filter((t) => t.docType === "act");
+
+  const getHTML = (tplId?: string) => {
+    const tpl = tplId ? s.templates.find((t) => t.id === tplId) : undefined;
+    if (tpl) return renderDocWithTemplate(tpl, form, s.companies, s.products);
+    return printAct1C(form, s.companies, s.products);
+  };
+
+  const handlePrint = (tplId?: string) => {
+    const html = getHTML(tplId);
     const win = window.open("", "_blank");
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 300); }
   };
 
-  const handlePreview = () => {
-    const html = printAct1C(form, s.companies, s.products);
+  const handlePreview = (tplId?: string) => {
+    const html = getHTML(tplId);
     const win = window.open("", "_blank");
     if (win) { win.document.write(html); win.document.close(); }
   };
@@ -120,13 +129,27 @@ export default function ActForm({ entityId }: { entityId?: string }) {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 mb-4">
         <Button onClick={handleSave}><Icon name="Save" size={14} className="mr-1" /> Сохранить</Button>
-        <Button variant="outline" onClick={handlePrint}><Icon name="Printer" size={14} className="mr-1" /> Печать</Button>
-        <Button variant="outline" onClick={handlePreview}><Icon name="Eye" size={14} className="mr-1" /> Предпросмотр</Button>
+        <Button variant="outline" onClick={() => handlePrint()}><Icon name="Printer" size={14} className="mr-1" /> Печать</Button>
+        <Button variant="outline" onClick={() => handlePreview()}><Icon name="Eye" size={14} className="mr-1" /> Предпросмотр</Button>
         <Button variant="outline" onClick={() => exportActExcel(form, s.companies, s.products)}><Icon name="Table" size={14} className="mr-1" /> Excel</Button>
         <Button variant="outline" onClick={() => exportActXML(form, s.companies, s.products)}><Icon name="Code" size={14} className="mr-1" /> XML</Button>
       </div>
+
+      {actTemplates.length > 0 && (
+        <div className="border rounded-lg p-3 bg-muted/10">
+          <Label className="text-xs text-muted-foreground mb-2 block">Печать по шаблону:</Label>
+          <div className="flex flex-wrap gap-2">
+            {actTemplates.map((tpl) => (
+              <div key={tpl.id} className="flex gap-1">
+                <Button size="sm" variant="outline" onClick={() => handlePreview(tpl.id)}><Icon name="Eye" size={12} className="mr-1" />{tpl.name}</Button>
+                <Button size="sm" variant="ghost" onClick={() => handlePrint(tpl.id)}><Icon name="Printer" size={12} /></Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

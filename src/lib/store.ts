@@ -1,4 +1,4 @@
-import { Company, Product, Invoice, Act, UPD, TabItem } from "./types";
+import { Company, Product, Invoice, Act, UPD, TabItem, TemplateSettings, DEFAULT_TEMPLATE, DocType } from "./types";
 
 const STORAGE_KEYS = {
   companies: "mb_companies",
@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   invoiceCounter: "mb_invoiceCounter",
   actCounter: "mb_actCounter",
   updCounter: "mb_updCounter",
+  templates: "mb_templates",
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -36,6 +37,7 @@ class Store {
   invoices: Invoice[] = [];
   acts: Act[] = [];
   upds: UPD[] = [];
+  templates: TemplateSettings[] = [];
   tabs: TabItem[] = [];
   activeTabId: string = "";
   invoiceCounter: number = 1;
@@ -53,11 +55,25 @@ class Store {
     this.invoiceCounter = load(STORAGE_KEYS.invoiceCounter, 1);
     this.actCounter = load(STORAGE_KEYS.actCounter, 1);
     this.updCounter = load(STORAGE_KEYS.updCounter, 1);
+    this.templates = load(STORAGE_KEYS.templates, []);
+
+    if (this.templates.length === 0) {
+      this.seedTemplates();
+    }
 
     if (this.companies.length === 0) {
       this.seed();
     }
     this.migrateData();
+  }
+
+  private seedTemplates() {
+    this.templates = [
+      { id: "tpl-invoice", name: "Счет (стандартный)", docType: "invoice" as DocType, ...DEFAULT_TEMPLATE },
+      { id: "tpl-act", name: "Акт (стандартный)", docType: "act" as DocType, ...DEFAULT_TEMPLATE, showBankBlock: false, showQR: false },
+      { id: "tpl-upd", name: "УПД (стандартный)", docType: "upd" as DocType, ...DEFAULT_TEMPLATE, showBankBlock: false, showQR: false },
+    ];
+    save(STORAGE_KEYS.templates, this.templates);
   }
 
   private migrateData() {
@@ -128,6 +144,7 @@ class Store {
     save(STORAGE_KEYS.invoiceCounter, this.invoiceCounter);
     save(STORAGE_KEYS.actCounter, this.actCounter);
     save(STORAGE_KEYS.updCounter, this.updCounter);
+    save(STORAGE_KEYS.templates, this.templates);
     this.notify();
   }
 
@@ -236,6 +253,25 @@ class Store {
   deleteUpd(id: string) {
     this.upds = this.upds.filter((u) => u.id !== id);
     this.persist();
+  }
+
+  saveTemplate(tpl: TemplateSettings) {
+    const idx = this.templates.findIndex((t) => t.id === tpl.id);
+    if (idx >= 0) {
+      this.templates = this.templates.map((t) => (t.id === tpl.id ? tpl : t));
+    } else {
+      this.templates = [...this.templates, tpl];
+    }
+    this.persist();
+  }
+
+  deleteTemplate(id: string) {
+    this.templates = this.templates.filter((t) => t.id !== id);
+    this.persist();
+  }
+
+  getTemplate(docType: DocType): TemplateSettings | undefined {
+    return this.templates.find((t) => t.docType === docType);
   }
 
   nextInvoiceNumber(): string {

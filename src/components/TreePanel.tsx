@@ -28,11 +28,18 @@ const TREE: TreeSection[] = [
       { label: "УПД", icon: "FileBadge", tab: { id: "upds", type: "upds", title: "УПД" } },
     ],
   },
+  {
+    label: "Настройки",
+    icon: "Settings",
+    children: [
+      { label: "Шаблоны печати", icon: "FileCog", tab: { id: "templates", type: "templates", title: "Шаблоны" } },
+    ],
+  },
 ];
 
 export default function TreePanel() {
   const s = useStore();
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({ Справочники: true, Документы: true });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({ Справочники: true, Документы: true, Настройки: true });
 
   const toggle = (label: string) => {
     setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
